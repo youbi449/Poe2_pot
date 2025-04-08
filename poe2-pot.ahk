@@ -8,17 +8,18 @@ SetTitleMatchMode, 2  ; Mode de correspondance pour les titres de fenêtres (2 =
 ; -- Configuration pour le mana (potion)
 manaPosX := 1774  ; Position X du pixel à surveiller pour le mana
 manaPosY := 966   ; Position Y du pixel à surveiller pour le mana
-manaCouleurPlein := "0x225992"  ; Couleur quand le mana est plein
+manaCouleurPlein := 0x225992  ; Couleur quand le mana est plein (IMPORTANT: sans guillemets)
 manaTouche := "2"  ; Touche à envoyer pour la potion de mana
 
 ; -- Configuration pour la vie (potion)
 viePosX := 148  ; Position X du pixel à surveiller pour la vie
 viePosY := 943   ; Position Y du pixel à surveiller pour la vie
-vieCouleurPlein := "0x7C1D221"  ; Couleur quand la vie est pleine
+vieCouleurPlein := 0x7C1D21  ; Couleur quand la vie est pleine (IMPORTANT: sans guillemets)
 vieTouche := "1"  ; Touche à envoyer pour la potion de vie
 
 ; -- Configuration générale
 delaiVerification := 100  ; Délai entre les vérifications en millisecondes
+delaiReutilisationPotion := 2000  ; Délai minimal entre deux utilisations de potion (en ms)
 logFichier := "poe2-logs.txt"  ; Fichier de log simplifié sans chemin absolu
 surveillanceActive := false  ; État initial de la surveillance
 
@@ -44,16 +45,21 @@ return
 
 ; Ajouter une entrée initiale au démarrage du script
 EcrireLog("=== DÉMARRAGE DU SCRIPT POE2-POTS (LOGIQUE INVERSÉE) ===")
-EcrireLog("Configuration Mana: Position X=" . manaPosX . " Y=" . manaPosY . ", Couleur plein=" . manaCouleurPlein . ", Touche=" . manaTouche)
-EcrireLog("Configuration Vie: Position X=" . viePosX . " Y=" . viePosY . ", Couleur plein=" . vieCouleurPlein . ", Touche=" . vieTouche)
+EcrireLog("Configuration Mana: Position X=" . manaPosX . " Y=" . manaPosY . ", Couleur plein=" . Format("0x{:06X}", manaCouleurPlein) . ", Touche=" . manaTouche)
+EcrireLog("Configuration Vie: Position X=" . viePosX . " Y=" . viePosY . ", Couleur plein=" . Format("0x{:06X}", vieCouleurPlein) . ", Touche=" . vieTouche)
+EcrireLog("Configuration Délai: Entre deux utilisations de potion = " . delaiReutilisationPotion . "ms")
 EcrireLog("LOGIQUE: Déclencher quand la couleur n'est PAS celle du mana/vie plein")
 
-MsgBox, Script POE2-POTS démarré (LOGIQUE INVERSÉE). Appuyez sur F1 pour activer/désactiver la surveillance. F2 pour tester la position du curseur. F3 pour tester les pixels configurés.
+MsgBox, Script POE2-POTS démarré (LOGIQUE INVERSÉE). Appuyez sur F1 pour activer/désactiver la surveillance. F2 pour tester la position du curseur. F3 pour tester les pixels configurés. F4 pour configurer le délai entre potions. F5 pour recalibrer les couleurs. F6 pour tester les potions sans vérifier les couleurs. F7 pour tester les touches manuellement.
 
 ; Activer ou désactiver la surveillance avec F1
 F1::
     surveillanceActive := !surveillanceActive
     if (surveillanceActive) {
+        ; Réinitialiser les variables de délai pour éviter des problèmes au démarrage
+        derniereManaAction := 0
+        derniereVieAction := 0
+        
         SetTimer, VerifierPixels, %delaiVerification%
         ToolTip, ACTIF, 0, 0
         Sleep, 1000
@@ -84,15 +90,32 @@ F3::
     
     message := "TEST PIXELS CIBLES:`n"
     message .= "MANA: X=" . manaPosX . " Y=" . manaPosY . ", Couleur actuelle=" . testCouleurMana . "`n"
-    message .= "  Couleur mana plein=" . manaCouleurPlein . "`n"
-    message .= "  État: " . (testCouleurMana = manaCouleurPlein ? "MANA PLEIN" : "MANA NON PLEIN (potion nécessaire)") . "`n`n"
+    message .= "  Couleur mana plein=" . Format("0x{:06X}", manaCouleurPlein) . "`n"
+    message .= "  État: " . ((testCouleurMana = manaCouleurPlein) ? "MANA PLEIN" : "MANA NON PLEIN (potion nécessaire)") . "`n`n"
     
     message .= "VIE: X=" . viePosX . " Y=" . viePosY . ", Couleur actuelle=" . testCouleurVie . "`n"
-    message .= "  Couleur vie pleine=" . vieCouleurPlein . "`n"
-    message .= "  État: " . (testCouleurVie = vieCouleurPlein ? "VIE PLEINE" : "VIE NON PLEINE (potion nécessaire)")
+    message .= "  Couleur vie pleine=" . Format("0x{:06X}", vieCouleurPlein) . "`n"
+    message .= "  État: " . ((testCouleurVie = vieCouleurPlein) ? "VIE PLEINE" : "VIE NON PLEINE (potion nécessaire)")
     
     EcrireLog(message)
     MsgBox, %message%
+return
+
+; Fonction pour configurer le délai de réutilisation des potions
+F4::
+    InputBox, nouveauDelai, Configuration Délai, Entrez le délai minimal entre deux utilisations de potion (en millisecondes):, , 300, 150, , , , , %delaiReutilisationPotion%
+    if (!ErrorLevel) {  ; Si l'utilisateur n'a pas annulé
+        if nouveauDelai is integer
+        {
+            delaiReutilisationPotion := nouveauDelai
+            EcrireLog("Configuration mise à jour: Délai entre potions = " . delaiReutilisationPotion . "ms")
+            MsgBox, Délai entre potions configuré à %delaiReutilisationPotion% ms
+        }
+        else
+        {
+            MsgBox, Erreur: Veuillez entrer un nombre entier valide.
+        }
+    }
 return
 
 ; Variables pour le suivi des actions
@@ -104,43 +127,79 @@ VerifierPixels:
     ; Vérifier que Path of Exile 2 est la fenêtre active
     IfWinActive, Path of Exile 2
     {
+        tempsActuel := A_TickCount
+        delaiDepuisManaAction := tempsActuel - derniereManaAction
+        delaiDepuisVieAction := tempsActuel - derniereVieAction
+        
         ; --- Vérification du MANA ---
         PixelGetColor, couleurActuelleMana, %manaPosX%, %manaPosY%, RGB
-        if (couleurActuelleMana != manaCouleurPlein) {
-            Send, %manaTouche%
-            
-            ; Log seulement si c'est la première action depuis un certain temps
-            tempsActuel := A_TickCount
-            if (tempsActuel - derniereManaAction > 2000) {
-                EcrireLog("ACTION MANA: Potion utilisée", false)
+        manaEstPlein := (couleurActuelleMana = manaCouleurPlein)
+        EcrireLog("DEBUG: Couleur Mana = " . couleurActuelleMana . " vs référence = " . Format("0x{:06X}", manaCouleurPlein) . " (égal: " . manaEstPlein . ")", false)
+        
+        if (!manaEstPlein) {  ; Si le mana n'est pas plein
+            ; Vérifier le délai depuis la dernière utilisation
+            if (delaiDepuisManaAction >= delaiReutilisationPotion || derniereManaAction = 0) {
+                Send, %manaTouche%
+                EcrireLog("ACTION MANA: Potion utilisée (délai écoulé: " . delaiDepuisManaAction . "ms)", false)
                 derniereManaAction := tempsActuel
+            } else {
+                EcrireLog("ATTENTE MANA: Délai insuffisant (" . delaiDepuisManaAction . "ms / " . delaiReutilisationPotion . "ms)", false)
             }
-            
-            Sleep, 150  ; Petit délai pour éviter de spammer la touche
         }
         
         ; --- Vérification de la VIE ---
         PixelGetColor, couleurActuelleVie, %viePosX%, %viePosY%, RGB
-        if (couleurActuelleVie != vieCouleurPlein) {
-            Send, %vieTouche%
-            
-            ; Log seulement si c'est la première action depuis un certain temps
-            tempsActuel := A_TickCount
-            if (tempsActuel - derniereVieAction > 2000) {
-                EcrireLog("ACTION VIE: Potion utilisée", false)
-                derniereVieAction := tempsActuel
-            }
-            
-            Sleep, 150  ; Petit délai pour éviter de spammer la touche
-        }
+        vieEstPleine := (couleurActuelleVie = vieCouleurPlein)
+        EcrireLog("DEBUG: Couleur Vie = " . couleurActuelleVie . " vs référence = " . Format("0x{:06X}", vieCouleurPlein) . " (égal: " . vieEstPleine . ")", false)
         
-        ; Pas de logs systématiques pour chaque vérification
+        if (!vieEstPleine) {  ; Si la vie n'est pas pleine
+            ; Vérifier le délai depuis la dernière utilisation
+            if (delaiDepuisVieAction >= delaiReutilisationPotion || derniereVieAction = 0) {
+                Send, %vieTouche%
+                EcrireLog("ACTION VIE: Potion utilisée (délai écoulé: " . delaiDepuisVieAction . "ms)", false)
+                derniereVieAction := tempsActuel
+            } else {
+                EcrireLog("ATTENTE VIE: Délai insuffisant (" . delaiDepuisVieAction . "ms / " . delaiReutilisationPotion . "ms)", false)
+            }
+        }
     } else {
         ; Log périodique pour indiquer que le jeu n'est pas actif
         Random, rnd, 1, 500  ; Réduit encore plus la fréquence des logs
         if (rnd = 1) {
             WinGetActiveTitle, titre
-            EcrireLog("INFO: Fenêtre Path of Exile 2 non active.", false)
+            EcrireLog("INFO: Fenêtre Path of Exile 2 non active. Fenêtre actuelle: " . titre, false)
         }
     }
+return
+
+; Fonction pour recalibrer les couleurs de référence
+F5::
+    PixelGetColor, nouvelleCouleurMana, %manaPosX%, %manaPosY%, RGB
+    PixelGetColor, nouvelleCouleurVie, %viePosX%, %viePosY%, RGB
+    
+    ; Convertir les valeurs en nombres hexadécimaux
+    manaCouleurPlein := nouvelleCouleurMana
+    vieCouleurPlein := nouvelleCouleurVie
+    
+    message := "RECALIBRATION DES COULEURS:`n"
+    message .= "Nouvelle couleur mana plein = " . Format("0x{:06X}", manaCouleurPlein) . "`n"
+    message .= "Nouvelle couleur vie pleine = " . Format("0x{:06X}", vieCouleurPlein)
+    
+    EcrireLog(message)
+    MsgBox, %message%
+    
+    ; Réinitialiser les compteurs de temps
+    derniereManaAction := 0
+    derniereVieAction := 0
+return
+
+; Pour tester directement les potions sans vérifier les couleurs (utile pour déboguer)
+F6::
+    Send, %manaTouche%
+    EcrireLog("TEST: Touche mana envoyée manuellement", false)
+return
+
+F7::
+    Send, %vieTouche%
+    EcrireLog("TEST: Touche vie envoyée manuellement", false)
 return 
