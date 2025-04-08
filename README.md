@@ -1,43 +1,64 @@
-# POE2-POT: Potion Assistant for Path of Exile 2
+# POE2-POTS - Automatic Potion Manager for Path of Exile 2
 
-An AutoHotkey script that automatically monitors and manages the use of health and mana potions in Path of Exile 2.
+## Description
+POE2-POTS is an AutoHotkey script that automatically monitors your health and mana in Path of Exile 2, and uses the corresponding potions when needed. It works with an "inverse" logic: it triggers potion use when the detected colors do not match the reference colors (when health/mana is not full).
 
 ## Features
+- Automatic health and mana monitoring
+- Pixel color detection (easy calibration)
+- Configurable delay between potion uses
+- Persistent configuration (saved between sessions)
+- Simple interface with keyboard shortcuts
+- Detailed logs for troubleshooting
 
-- **Automatic potion usage**: Detects when your health or mana is not full and uses the corresponding potions
-- **Intelligent monitoring**: Only works when Path of Exile 2 is the active window
-- **Full customization**: Configurable pixel positions to monitor, reference colors, and keys to activate
-- **Logging**: Tracks script actions for debugging
-- **Testing functions**: Built-in tools to verify configuration and adjust parameters
+## Prerequisites
+- AutoHotkey v1.1 or higher
+- Windows 10 or higher
+- Path of Exile 2
 
-## How to Use
+## Installation
+1. Download and install [AutoHotkey](https://www.autohotkey.com/) if you haven't already
+2. Download the script files
+3. Double-click on `poe2-pot.ahk` to run it
 
-1. **Installation**: Make sure you have AutoHotkey installed on your system.
-2. **Startup**: Launch the script by double-clicking on `poe2-pot.ahk`.
-3. **Controls**:
-   - `F1`: Enable/disable monitoring
-   - `F2`: Test the position and color of the pixel under the cursor
-   - `F3`: Check the configured pixels for mana and health
+## Initial Setup
+1. Launch Path of Exile 2
+2. Run the script (double-click on `poe2-pot.ahk`)
+3. In the game, make sure your health and mana are full
+4. Press **F5** to calibrate the reference colors
+5. Press **F1** to activate monitoring
 
-## Configuration
+## Usage
 
-The script uses inverse logic: it triggers potion use when the detected color **does not match** the color configured for a "full" state.
+### Keyboard Shortcuts
+- **F1**: Enable/disable monitoring
+- **F2**: Test the position and color under the cursor
+- **F3**: Test the configured pixels (health and mana)
+- **F4**: Configure the delay between two potion uses
+- **F5**: Recalibrate reference colors (when health and mana are full)
 
-### Default Parameters
-- **Mana**: Position X=1774, Y=966, Full color=0x225992, Key=2
-- **Health**: Position X=148, Y=943, Full color=0x7C1D221, Key=1
-
-To customize these parameters, modify the variables at the beginning of the script.
-
-## Important Notes
-
-- The script is designed to work only when Path of Exile 2 is the active window
-- Accuracy depends on your screen resolution and the game's graphic settings
-- Use the test functions (F2 and F3) to adjust positions and colors if necessary
+### Generated Files
+- **poe2-logs.txt**: Log of actions and events
+- **poe2-pot-config.ini**: Saved configuration (colors and delays)
 
 ## Troubleshooting
+If the script is not working correctly:
 
-If the script isn't working correctly:
-1. Verify that the pixel positions match your game interface
-2. Use F2 to capture the correct colors when your health/mana is full
-3. Check the log file `poe2-logs.txt` to identify problems 
+1. Verify that the "Path of Exile 2" window is active
+2. Make sure you have calibrated the colors with F5 when your health and mana are full
+3. Check the `poe2-logs.txt` file to see the detected colors
+4. If necessary, recalibrate with F5 to update the reference colors
+
+## Advanced Customization
+You can directly modify the script to adjust:
+- Pixel positions to monitor (manaPosX, manaPosY, viePosX, viePosY)
+- Keys to send for potions (manaTouche, vieTouche)
+- Time between checks (delaiVerification)
+
+## License
+This script is provided as-is, without warranty. Use at your own risk.
+
+## Notes
+- This script works by detecting colors at specific positions on the screen.
+- If you change the game resolution or interface, you will need to adjust the positions or recalibrate.
+- The script only works when the Path of Exile 2 window is active. 

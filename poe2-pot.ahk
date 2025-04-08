@@ -4,17 +4,20 @@ SendMode Input  ; Recommandé pour les nouveaux scripts
 SetWorkingDir %A_ScriptDir%  ; Garantit la cohérence du répertoire de travail
 SetTitleMatchMode, 2  ; Mode de correspondance pour les titres de fenêtres (2 = contient)
 
+; Fichier de configuration pour sauvegarder les paramètres
+fichierConfig := "poe2-pot-config.ini"
+
 ; Variables de configuration
 ; -- Configuration pour le mana (potion)
 manaPosX := 1774  ; Position X du pixel à surveiller pour le mana
 manaPosY := 966   ; Position Y du pixel à surveiller pour le mana
-manaCouleurPlein := 0x225992  ; Couleur quand le mana est plein (IMPORTANT: sans guillemets)
+manaCouleurPlein := 0x225992  ; Couleur par défaut quand le mana est plein
 manaTouche := "2"  ; Touche à envoyer pour la potion de mana
 
 ; -- Configuration pour la vie (potion)
 viePosX := 148  ; Position X du pixel à surveiller pour la vie
 viePosY := 943   ; Position Y du pixel à surveiller pour la vie
-vieCouleurPlein := 0x7C1D21  ; Couleur quand la vie est pleine (IMPORTANT: sans guillemets)
+vieCouleurPlein := 0x7C1D21  ; Couleur par défaut quand la vie est pleine
 vieTouche := "1"  ; Touche à envoyer pour la potion de vie
 
 ; -- Configuration générale
@@ -23,8 +26,50 @@ delaiReutilisationPotion := 2000  ; Délai minimal entre deux utilisations de po
 logFichier := "poe2-logs.txt"  ; Fichier de log simplifié sans chemin absolu
 surveillanceActive := false  ; État initial de la surveillance
 
+; Charger les paramètres sauvegardés s'ils existent
+ChargerConfig()
+
 ; Initialiser le fichier de log avec un en-tête simple
 FileDelete, %logFichier%  ; Supprimer l'ancien fichier de log au démarrage
+
+; Fonction pour charger la configuration
+ChargerConfig() {
+    global fichierConfig, manaCouleurPlein, vieCouleurPlein, delaiReutilisationPotion
+    
+    ; Vérifier si le fichier existe
+    if (FileExist(fichierConfig)) {
+        ; Lire les valeurs depuis le fichier INI
+        IniRead, manaCouleurHex, %fichierConfig%, Couleurs, ManaCouleurPlein, 0x225992
+        IniRead, vieCouleurHex, %fichierConfig%, Couleurs, VieCouleurPlein, 0x7C1D21
+        IniRead, delaiReutilisationPotion, %fichierConfig%, Delais, ReutilisationPotion, 2000
+        
+        ; Convertir les valeurs hexadécimales en nombres
+        manaCouleurPlein := "0x" . SubStr(manaCouleurHex, 3) ; Enlever le "0x" et le remettre pour s'assurer du format
+        vieCouleurPlein := "0x" . SubStr(vieCouleurHex, 3)
+        
+        EcrireLog("Configuration chargée depuis " . fichierConfig)
+    } else {
+        ; Créer le fichier avec les valeurs par défaut
+        SauvegarderConfig()
+        EcrireLog("Nouveau fichier de configuration créé: " . fichierConfig)
+    }
+}
+
+; Fonction pour sauvegarder la configuration
+SauvegarderConfig() {
+    global fichierConfig, manaCouleurPlein, vieCouleurPlein, delaiReutilisationPotion
+    
+    ; Formater les couleurs en hexadécimal
+    manaCouleurHex := Format("0x{:06X}", manaCouleurPlein)
+    vieCouleurHex := Format("0x{:06X}", vieCouleurPlein)
+    
+    ; Enregistrer dans le fichier INI
+    IniWrite, %manaCouleurHex%, %fichierConfig%, Couleurs, ManaCouleurPlein
+    IniWrite, %vieCouleurHex%, %fichierConfig%, Couleurs, VieCouleurPlein
+    IniWrite, %delaiReutilisationPotion%, %fichierConfig%, Delais, ReutilisationPotion
+    
+    EcrireLog("Configuration sauvegardée dans " . fichierConfig)
+}
 
 ; Fonction pour écrire dans le fichier log - simple et sans Try/Catch
 EcrireLog(message, afficherTooltip := true) {
@@ -50,7 +95,7 @@ EcrireLog("Configuration Vie: Position X=" . viePosX . " Y=" . viePosY . ", Coul
 EcrireLog("Configuration Délai: Entre deux utilisations de potion = " . delaiReutilisationPotion . "ms")
 EcrireLog("LOGIQUE: Déclencher quand la couleur n'est PAS celle du mana/vie plein")
 
-MsgBox, Script POE2-POTS démarré (LOGIQUE INVERSÉE). Appuyez sur F1 pour activer/désactiver la surveillance. F2 pour tester la position du curseur. F3 pour tester les pixels configurés. F4 pour configurer le délai entre potions. F5 pour recalibrer les couleurs. F6 pour tester les potions sans vérifier les couleurs. F7 pour tester les touches manuellement.
+MsgBox, Script POE2-POTS démarré (LOGIQUE INVERSÉE).`nAppuyez sur F1 pour activer/désactiver la surveillance.`nF2 pour tester la position du curseur.`nF3 pour tester les pixels configurés.`nF4 pour configurer le délai entre potions.`nF5 pour recalibrer les couleurs (sauvegarde automatique).
 
 ; Activer ou désactiver la surveillance avec F1
 F1::
@@ -108,8 +153,9 @@ F4::
         if nouveauDelai is integer
         {
             delaiReutilisationPotion := nouveauDelai
+            SauvegarderConfig()  ; Sauvegarder la nouvelle configuration
             EcrireLog("Configuration mise à jour: Délai entre potions = " . delaiReutilisationPotion . "ms")
-            MsgBox, Délai entre potions configuré à %delaiReutilisationPotion% ms
+            MsgBox, Délai entre potions configuré à %delaiReutilisationPotion% ms et sauvegardé
         }
         else
         {
@@ -181,9 +227,13 @@ F5::
     manaCouleurPlein := nouvelleCouleurMana
     vieCouleurPlein := nouvelleCouleurVie
     
+    ; Sauvegarder la configuration
+    SauvegarderConfig()
+    
     message := "RECALIBRATION DES COULEURS:`n"
     message .= "Nouvelle couleur mana plein = " . Format("0x{:06X}", manaCouleurPlein) . "`n"
-    message .= "Nouvelle couleur vie pleine = " . Format("0x{:06X}", vieCouleurPlein)
+    message .= "Nouvelle couleur vie pleine = " . Format("0x{:06X}", vieCouleurPlein) . "`n"
+    message .= "Configuration sauvegardée et persistante."
     
     EcrireLog(message)
     MsgBox, %message%
@@ -192,14 +242,3 @@ F5::
     derniereManaAction := 0
     derniereVieAction := 0
 return
-
-; Pour tester directement les potions sans vérifier les couleurs (utile pour déboguer)
-F6::
-    Send, %manaTouche%
-    EcrireLog("TEST: Touche mana envoyée manuellement", false)
-return
-
-F7::
-    Send, %vieTouche%
-    EcrireLog("TEST: Touche vie envoyée manuellement", false)
-return 
